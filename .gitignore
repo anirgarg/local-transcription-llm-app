@@ -1,0 +1,22 @@
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# macOS
+.DS_Store
+
+# Secrets / local data (app stores these outside the repo, but just in case)
+hf_token
+*.env
+.env
+Transcriptions/
+*.wav
+*.m4a
+*.mp3
+
+# Models
+models/
+*.gguf
+*.safetensors

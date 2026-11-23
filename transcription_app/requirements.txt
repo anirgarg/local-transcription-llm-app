@@ -1,0 +1,19 @@
+# Core audio
+sounddevice>=0.4.6
+numpy>=1.24.0
+
+# Transcription — Apple MLX-native Whisper (fastest on Apple Silicon)
+mlx-whisper>=0.4.0
+
+# GUI
+customtkinter>=5.2.0
+Pillow>=10.0.0
+
+# LLM summarization via Ollama
+ollama>=0.3.0
+
+# Utilities (pure-Python only — no compilation needed)
+scipy>=1.11.0
+
+# Speaker diarization (optional — requires HuggingFace token, see README)
+pyannote.audio>=3.0.0
