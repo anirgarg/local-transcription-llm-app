@@ -23,11 +23,19 @@ except ImportError:
     pass
 
 
-# Model tiers by unified memory (GB). Whisper + the app need ~4-6 GB on top.
+# Model tiers by unified memory (GB), best first. Sizes verified against the
+# Ollama registry, Nov 2026. Whisper + the app need ~3-5 GB on top.
 MODEL_TIERS = [
-    (40, "qwen2.5:32b"),   # ~20 GB  — 48 GB+ Macs
-    (20, "qwen2.5:14b"),   # ~9 GB   — 24-36 GB Macs
-    (0,  "qwen2.5:7b"),    # ~4.7 GB — 8-16 GB Macs
+    (32, "qwen3.8:27b"),   # 17.7 GB — dense 27B, 262K ctx — 32 GB+ Macs
+    (12, "gemma4:12b"),    # 8.0 GB  — 256K ctx           — 16-24 GB Macs
+    (0,  "gemma4:e4b"),    # 6.6 GB                       — 8 GB Macs
+]
+
+# Older defaults: still used if installed and nothing newer is.
+LEGACY_MODELS = [
+    (40, "qwen2.5:32b"),
+    (20, "qwen2.5:14b"),
+    (0,  "qwen2.5:7b"),
 ]
 
 
@@ -52,7 +60,7 @@ def pick_default_model() -> str:
     """
     1. TRANSCRIBE_MODEL env var, if set.
     2. The RAM-appropriate tier model, if installed in Ollama.
-    3. Otherwise the largest installed tier model that fits in RAM.
+    3. Otherwise the best installed tier (or legacy) model that fits in RAM.
     4. Otherwise the RAM-appropriate model name (user is told to pull it).
     """
     env = os.environ.get("TRANSCRIBE_MODEL", "").strip()
@@ -65,11 +73,26 @@ def pick_default_model() -> str:
         installed = {m.model for m in ollama.list().models}
     except Exception:
         return rec
-    fits = [m for g, m in MODEL_TIERS if system_ram_gb() >= g]
-    for m in fits:  # largest first
+    ram = system_ram_gb()
+    fits = [m for g, m in MODEL_TIERS + LEGACY_MODELS if ram >= g]
+    for m in fits:  # newest/largest first
         if m in installed:
             return m
     return rec
+
+
+def context_size(prompt: str) -> int:
+    """
+    Ollama truncates input beyond num_ctx, silently cutting long meetings.
+    Size the window to the prompt (~3.5 chars/token) plus room for the
+    summary, capped by RAM to keep the KV cache reasonable.
+    """
+    needed = int(len(prompt) / 3.5) + 4096
+    cap = 65536 if system_ram_gb() >= 32 else 32768
+    ctx = 8192
+    while ctx < needed and ctx < cap:
+        ctx *= 2
+    return min(ctx, cap)
 
 
 DEFAULT_MODEL = recommended_model()
@@ -178,11 +201,10 @@ class Summarizer:
 
     def _warmup(self):
         try:
-            ollama.chat(
-                model=self.model,
-                messages=[{"role": "user", "content": "ready"}],
+            self._chat(
+                [{"role": "user", "content": "ready"}],
                 stream=False,
-                options={"num_predict": 1},
+                options={"num_predict": 1, "num_ctx": 8192},
             )
         except Exception:
             pass
@@ -229,6 +251,30 @@ class Summarizer:
             daemon=True,
         ).start()
 
+    def _chat(self, messages, stream: bool, options: dict):
+        """
+        Call Ollama with thinking disabled (Qwen3.x / Gemma 4 otherwise spend
+        minutes reasoning before writing). Retries without the flag for
+        models that don't accept it.
+        """
+        def call(**extra):
+            resp = ollama.chat(model=self.model, messages=messages,
+                               stream=stream, options=options, **extra)
+            if not stream:
+                return resp
+            first = next(resp, None)   # errors surface on first chunk
+            def gen():
+                if first is not None:
+                    yield first
+                yield from resp
+            return gen()
+        try:
+            return call(think=False)
+        except Exception as e:
+            if "think" not in str(e).lower():
+                raise
+            return call()
+
     def _run_summary(self, transcript: str):
         prompt = SUMMARY_PROMPT.format(transcript=transcript)
         self._stream(prompt)
@@ -244,13 +290,15 @@ class Summarizer:
     def _stream(self, prompt: str):
         full_response = []
         try:
-            stream = ollama.chat(
-                model=self.model,
-                messages=[{"role": "user", "content": prompt}],
+            stream = self._chat(
+                [{"role": "user", "content": prompt}],
                 stream=True,
+                options={"num_ctx": context_size(prompt)},
             )
             for chunk in stream:
-                token = chunk["message"]["content"]
+                token = chunk["message"]["content"] or ""
+                if not token:
+                    continue
                 full_response.append(token)
                 self.on_token(token)
 

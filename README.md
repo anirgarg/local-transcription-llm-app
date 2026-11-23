@@ -13,7 +13,7 @@ and generates AI summaries via [Ollama](https://ollama.com).
 - **Apple Silicon Mac (M1 or later), macOS 13 Ventura+.** Intel Macs, Windows and Linux are not supported (the app uses Apple's MLX framework).
 - **Homebrew** — [brew.sh](https://brew.sh)
 - **Xcode Command Line Tools** — `xcode-select --install` (the setup script prompts if missing)
-- **Ollama** (for AI summaries) — [ollama.com](https://ollama.com)
+- **Ollama**, recent version (for AI summaries; Gemma 4 / Qwen3.8 need a 2026 release) — [ollama.com](https://ollama.com)
 - **BlackHole 2ch** (optional, for online meetings) — [existential.audio/blackhole](https://existential.audio/blackhole/)
 - **Hugging Face token** (optional, for speaker labels) — see [Speaker Diarization](#speaker-diarization)
 - **Disk:** ~1.5 GB for the app environment + Whisper, plus 5–20 GB for the summary model
@@ -52,15 +52,19 @@ The app picks a summary model automatically based on your Mac's memory:
 
 | Unified memory | Default model | Download size |
 |---|---|---|
-| 8–16 GB | `qwen2.5:7b` | ~4.7 GB |
-| 24–36 GB | `qwen2.5:14b` | ~9 GB |
-| 48 GB+ | `qwen2.5:32b` | ~20 GB |
+| 8 GB | `gemma4:e4b` | 6.6 GB |
+| 16–24 GB | `gemma4:12b` | 8.0 GB |
+| 32 GB+ | `qwen3.8:27b` | 17.7 GB |
 
-If the recommended model isn't installed but a smaller one from this list is, the app uses that. Install a model with, e.g.:
+Picks current as of November 2026: Qwen3.8-27B is the strongest dense model that fits a 32 GB Mac, and Gemma 4 12B is the usual recommendation for summarization on smaller machines. Thinking mode is turned off for summaries (much faster, no quality loss for this task), and the context window is sized to the transcript so long meetings aren't cut off.
+
+If the recommended model isn't installed, the app uses the best one it finds from this list (or the older `qwen2.5` defaults). Install a model with, e.g.:
 
 ```bash
-ollama pull qwen2.5:14b
+ollama pull gemma4:12b
 ```
+
+Prefer a different model? `gemma4:31b` (20.4 GB) is a good alternative on 48 GB+ Macs.
 
 To force a specific model (any Ollama model works), set `TRANSCRIBE_MODEL` before launching:
 
