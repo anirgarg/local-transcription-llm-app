@@ -7,9 +7,8 @@ Runs as a post-processing step after recording stops, producing
 onto the Whisper transcript.
 
 Setup (one-time):
-  1. pip install pyannote.audio
-  2. Accept model terms at https://hf.co/pyannote/speaker-diarization-3.1
-     and https://hf.co/pyannote/segmentation-3.0
+  1. pip install "pyannote.audio>=4.1,<5"   (done by SETUP_AND_BUILD.command)
+  2. Accept model terms at https://hf.co/pyannote/speaker-diarization-community-1
   3. Create a free HuggingFace token at https://hf.co/settings/tokens
   4. Paste the token into the app's Settings → HuggingFace Token field
 """
@@ -38,6 +37,7 @@ def _check_pyannote() -> bool:
 
 HF_TOKEN_FILE = Path.home() / ".config" / "transcription_app" / "hf_token"
 SAMPLE_RATE   = 16000
+DIARIZATION_MODEL = "pyannote/speaker-diarization-community-1"
 
 # (start_seconds, end_seconds, "SPEAKER_00")
 DiarizationSegment = Tuple[float, float, str]
@@ -45,7 +45,7 @@ DiarizationSegment = Tuple[float, float, str]
 
 class Diarizer:
     """
-    Wraps pyannote speaker-diarization-3.1.
+    Wraps pyannote speaker-diarization-community-1 (pyannote.audio 4.x).
 
     Usage:
         d = Diarizer()
@@ -97,10 +97,22 @@ class Diarizer:
                 raise RuntimeError("No HuggingFace token configured.")
             if on_status:
                 on_status("Loading speaker diarization model…")
-            self._pipeline = _Pipeline.from_pretrained(
-                "pyannote/speaker-diarization-3.1",
-                use_auth_token=token,
-            )
+            try:
+                self._pipeline = _Pipeline.from_pretrained(
+                    DIARIZATION_MODEL, token=token)
+            except Exception as e:
+                msg = str(e)
+                if any(k in msg for k in ("401", "403", "gated", "restricted", "accept")):
+                    raise RuntimeError(
+                        "Hugging Face denied access to the diarization model. "
+                        "Accept the terms at https://hf.co/" + DIARIZATION_MODEL +
+                        " (logged in as the token's account), then try again."
+                    ) from e
+                raise
+            if self._pipeline is None:
+                raise RuntimeError(
+                    "Could not load " + DIARIZATION_MODEL + " — check your token "
+                    "and that you accepted the model terms on Hugging Face.")
             # Use Apple Silicon GPU if torch + MPS is available
             try:
                 import torch
@@ -175,10 +187,22 @@ class Diarizer:
                 self.load(on_status=on_status)
             if on_status:
                 on_status("Identifying speakers…")
-            diarization = self._pipeline(wav_path)
+            # Pass audio in memory: avoids pyannote 4's ffmpeg/torchcodec
+            # file decoding, which isn't always available.
+            import torch
+            with wave.open(wav_path, "rb") as wf:
+                sr = wf.getframerate()
+                pcm = np.frombuffer(wf.readframes(wf.getnframes()), dtype=np.int16)
+            waveform = torch.from_numpy(pcm.astype(np.float32) / 32768.0).unsqueeze(0)
+            out = self._pipeline({"waveform": waveform, "sample_rate": sr})
+            # pyannote 4 returns DiarizeOutput; prefer the non-overlapping
+            # ("exclusive") track, which maps cleanly onto transcript segments.
+            ann = getattr(out, "exclusive_speaker_diarization", None)
+            if ann is None:
+                ann = getattr(out, "speaker_diarization", out)
             segments = [
                 (turn.start, turn.end, speaker)
-                for turn, _, speaker in diarization.itertracks(yield_label=True)
+                for turn, _, speaker in ann.itertracks(yield_label=True)
             ]
             on_done(segments)
         except Exception as e:

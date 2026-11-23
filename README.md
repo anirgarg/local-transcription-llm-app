@@ -147,9 +147,11 @@ Requires **BlackHole 2ch** — a free virtual audio driver.
 Optional: labels who said what, using [pyannote](https://github.com/pyannote/pyannote-audio).
 
 1. Create a free account at [huggingface.co](https://huggingface.co)
-2. Accept the model terms at [pyannote/speaker-diarization-3.1](https://huggingface.co/pyannote/speaker-diarization-3.1) and [pyannote/segmentation-3.0](https://huggingface.co/pyannote/segmentation-3.0)
+2. Accept the model terms at [pyannote/speaker-diarization-community-1](https://huggingface.co/pyannote/speaker-diarization-community-1) (while logged in to the same account as your token)
 3. Create a read token at [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens)
 4. Paste it into the app's settings panel (**HuggingFace Token**)
+
+After you press Stop, the app rebuilds the recording, runs pyannote on your Mac's GPU to group speech by voice, matches each transcript line to the speaker talking at that moment, then asks you to name each speaker. The model downloads once; audio never leaves the Mac. Works best with 2–4 distinct voices; accuracy drops with heavy cross-talk or a whole room on one mic.
 
 The token is stored locally at `~/.config/transcription_app/hf_token`, never in the project folder.
 

@@ -87,6 +87,7 @@ for name, stmt in [
     ("sounddevice",    "import sounddevice"),
     ("mlx_whisper",    "import mlx_whisper"),
     ("ollama",         "import ollama"),
+    ("pyannote.audio", "import pyannote.audio"),
 ]:
     try:
         exec(stmt); print(f"    ✓ {name}")

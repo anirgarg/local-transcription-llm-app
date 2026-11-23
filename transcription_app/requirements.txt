@@ -1,6 +1,6 @@
 # Core audio
 sounddevice>=0.4.6
-numpy>=1.24.0
+numpy>=1.24.0,<2.5   # numba (via mlx-whisper) needs <2.5
 
 # Transcription — Apple MLX-native Whisper (fastest on Apple Silicon)
 mlx-whisper>=0.4.0
@@ -16,4 +16,4 @@ ollama>=0.3.0
 scipy>=1.11.0
 
 # Speaker diarization (optional — requires HuggingFace token, see README)
-pyannote.audio>=3.0.0
+pyannote.audio>=4.1,<5
