@@ -20,3 +20,6 @@ Transcriptions/
 models/
 *.gguf
 *.safetensors
+
+# Built per-machine by SETUP_AND_BUILD.command
+LocalTranscription.app/

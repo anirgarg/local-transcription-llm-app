@@ -24,6 +24,22 @@ RESOURCES_DIR="$CONTENTS/Resources"
 BINARY="$MACOS_DIR/LocalTranscription"
 VENV_PYTHON="$VENV/bin/python3"
 
+# ── Pre-flight checks ─────────────────────────────────────────────────────────
+if [ "$(uname -m)" != "arm64" ]; then
+    echo "  ✗ This app requires an Apple Silicon (M-series) Mac."
+    read -p "  Press Return to close…  " _; exit 1
+fi
+if [ ! -x /opt/homebrew/bin/brew ]; then
+    echo "  ✗ Homebrew not found. Install it first: https://brew.sh"
+    read -p "  Press Return to close…  " _; exit 1
+fi
+if ! xcode-select -p &>/dev/null || ! command -v swiftc &>/dev/null; then
+    echo "  ✗ Xcode Command Line Tools are required (to compile the launcher)."
+    echo "    Starting the installer now — re-run this script when it finishes."
+    xcode-select --install 2>/dev/null || true
+    read -p "  Press Return to close…  " _; exit 1
+fi
+
 eval "$(/opt/homebrew/bin/brew shellenv)"
 PYTHON312="/opt/homebrew/opt/python@3.12/bin/python3.12"
 
@@ -165,6 +181,28 @@ echo "  [5/5] Generating icon…"
 "$VENV_PYTHON" "$APP_DIR/make_icon.py" "$APP" 2>/dev/null \
     && echo "  ✓ Icon generated" \
     || echo "  ⚠ Icon skipped (non-fatal)"
+
+# ── Ollama model (optional) ───────────────────────────────────────────────────
+echo ""
+REC_MODEL="$(cd "$APP_DIR" && "$VENV_PYTHON" -c 'import summarizer; print(summarizer.recommended_model())')"
+RAM_GB="$(( $(sysctl -n hw.memsize) / 1073741824 ))"
+echo "  Recommended summary model for ${RAM_GB} GB RAM: $REC_MODEL"
+if command -v ollama &>/dev/null; then
+    if ollama list 2>/dev/null | awk '{print $1}' | grep -qx "$REC_MODEL"; then
+        echo "  ✓ $REC_MODEL already installed"
+    else
+        read -p "  Download $REC_MODEL now? (several GB) [y/N] " ans
+        if [[ "$ans" =~ ^[Yy]$ ]]; then
+            pgrep -x ollama >/dev/null || (open -a Ollama; sleep 3)
+            ollama pull "$REC_MODEL" || echo "  ⚠ Pull failed — run: ollama pull $REC_MODEL"
+        else
+            echo "  Later, run: ollama pull $REC_MODEL"
+        fi
+    fi
+else
+    echo "  ⚠ Ollama not installed (needed for summaries): https://ollama.com"
+    echo "    Then run: ollama pull $REC_MODEL"
+fi
 
 echo ""
 echo "  ══════════════════════════════════════════════════════════════"

@@ -5,9 +5,12 @@ Post-meeting AI summarization via Ollama (100% local).
 Extracts a concise summary and action items from the transcript.
 
 Requires Ollama to be running: https://ollama.com
-Default model: qwen2.5:32b (high quality, fits comfortably in 48 GB RAM)
+Default model is chosen by available RAM (see pick_default_model); override with
+the TRANSCRIBE_MODEL environment variable.
 """
 
+import os
+import subprocess
 import threading
 from typing import Callable, Optional
 
@@ -20,7 +23,56 @@ except ImportError:
     pass
 
 
-DEFAULT_MODEL = "qwen2.5:32b"
+# Model tiers by unified memory (GB). Whisper + the app need ~4-6 GB on top.
+MODEL_TIERS = [
+    (40, "qwen2.5:32b"),   # ~20 GB  — 48 GB+ Macs
+    (20, "qwen2.5:14b"),   # ~9 GB   — 24-36 GB Macs
+    (0,  "qwen2.5:7b"),    # ~4.7 GB — 8-16 GB Macs
+]
+
+
+def system_ram_gb() -> float:
+    try:
+        out = subprocess.run(["sysctl", "-n", "hw.memsize"],
+                             capture_output=True, text=True, timeout=2).stdout
+        return int(out.strip()) / 1024**3
+    except Exception:
+        return 16.0
+
+
+def recommended_model() -> str:
+    ram = system_ram_gb()
+    for min_gb, model in MODEL_TIERS:
+        if ram >= min_gb:
+            return model
+    return MODEL_TIERS[-1][1]
+
+
+def pick_default_model() -> str:
+    """
+    1. TRANSCRIBE_MODEL env var, if set.
+    2. The RAM-appropriate tier model, if installed in Ollama.
+    3. Otherwise the largest installed tier model that fits in RAM.
+    4. Otherwise the RAM-appropriate model name (user is told to pull it).
+    """
+    env = os.environ.get("TRANSCRIBE_MODEL", "").strip()
+    if env:
+        return env
+    rec = recommended_model()
+    if not OLLAMA_AVAILABLE:
+        return rec
+    try:
+        installed = {m.model for m in ollama.list().models}
+    except Exception:
+        return rec
+    fits = [m for g, m in MODEL_TIERS if system_ram_gb() >= g]
+    for m in fits:  # largest first
+        if m in installed:
+            return m
+    return rec
+
+
+DEFAULT_MODEL = recommended_model()
 
 SUMMARY_PROMPT = """\
 You are an expert meeting facilitator producing a professional meeting summary. \
@@ -97,12 +149,12 @@ class Summarizer:
         on_token: Callable[[str], None],
         on_done: Optional[Callable[[str], None]] = None,
         on_error: Optional[Callable[[str], None]] = None,
-        model: str = DEFAULT_MODEL,
+        model: Optional[str] = None,
     ):
         self.on_token = on_token
         self.on_done = on_done or (lambda _: None)
         self.on_error = on_error or (lambda _: None)
-        self.model = model
+        self.model = model or pick_default_model()
         self._thread: Optional[threading.Thread] = None
 
     def is_available(self) -> bool:
@@ -154,7 +206,7 @@ class Summarizer:
             self.on_error(
                 "Ollama is not running or not installed.\n\n"
                 "Install from https://ollama.com, then run:\n"
-                "  ollama pull qwen2.5:32b"
+                f"  ollama pull {self.model}"
             )
             return
 
