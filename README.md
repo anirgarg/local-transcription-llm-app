@@ -8,6 +8,10 @@ and generates AI summaries via [Ollama](https://ollama.com).
 
 ---
 
+See [CHANGELOG.md](CHANGELOG.md) for recent changes and what's been tested.
+
+---
+
 ## Requirements
 
 - **Apple Silicon Mac (M1 or later), macOS 13 Ventura+.** Intel Macs, Windows and Linux are not supported (the app uses Apple's MLX framework).
