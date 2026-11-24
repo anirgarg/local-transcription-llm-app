@@ -146,6 +146,16 @@ Requires **BlackHole 2ch** — a free virtual audio driver.
 
 ---
 
+## Clinical Vocabulary
+
+For English (and auto-detect), the app gives Whisper a list of clinical terms (common primary-care drugs, labs and abbreviations) so it spells them correctly. In testing this raised drug-name accuracy from about 10/17 to 15/17 terms.
+
+To use your own list, copy `transcription_app/vocabulary_default.txt` to `~/.config/transcription_app/vocabulary.txt` and edit it (put the most important terms first; Whisper only uses roughly the first 50–60). To turn it off: `launchctl setenv TRANSCRIBE_VOCAB 0`.
+
+If Whisper hears only silence it can sometimes repeat the list back; the app detects and drops those lines.
+
+---
+
 ## Speaker Diarization
 
 Optional: labels who said what, using [pyannote](https://github.com/pyannote/pyannote-audio).
@@ -183,7 +193,7 @@ Source lives in `transcription_app/`:
 ```
 main.py              — CustomTkinter GUI, single-window design, event loop
 audio_capture.py     — sounddevice streams, voice-activity detection, chunk emitter
-transcriber.py       — mlx-whisper inference, background worker thread
+transcriber.py       — mlx-whisper inference, clinical vocabulary prompt, background worker
 summarizer.py        — Ollama streaming chat, RAM-based model selection
 diarizer.py          — pyannote speaker diarization (optional)
 calendar_sync.py     — reads today's events from macOS Calendar (AppleScript)

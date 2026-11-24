@@ -1,0 +1,14 @@
+# Clinical vocabulary hints for Whisper (English only).
+# Copy this file to ~/.config/transcription_app/vocabulary.txt and edit it
+# to add your own drug names, clinicians' names or local terms.
+# One term per line, or comma-separated. Lines starting with # are ignored.
+# Whisper only uses roughly the first 50-60 terms, so put the important ones first.
+metformin, empagliflozin, dapagliflozin, semaglutide, insulin glargine
+apixaban, rivaroxaban, warfarin, clopidogrel
+bisoprolol, metoprolol, amlodipine, ramipril, perindopril, candesartan
+hydrochlorothiazide, furosemide, spironolactone
+atorvastatin, rosuvastatin, ezetimibe, levothyroxine
+salbutamol, fluticasone, budesonide, formoterol, tiotropium, umeclidinium, vilanterol, montelukast
+pantoprazole, sertraline, escitalopram, duloxetine, gabapentin, pregabalin
+acetaminophen, ibuprofen, naproxen, hydromorphone, prednisone, amoxicillin, nitrofurantoin
+eGFR, A1C, TSH, BNP, INR, CBC, COPD, CHF, GERD
